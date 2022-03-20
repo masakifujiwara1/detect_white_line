@@ -161,9 +161,9 @@ class detect_white_line_node():
             z = y1 - y2
         else:
             z = y2 - y1
-        tan = float(z) / 640
-        self.deg = math.degrees(math.atan(tan))
-        print("degree ->", round(self.deg, 2))
+        tan_theta = float(z) / 640
+        self.deg = math.degrees(math.atan(tan_theta))
+        print("degree ->", round(self.deg, 3))
 
     def draw_line(self, a, b, img2):
         y2 = -1 * (a * 640 + b)
@@ -182,9 +182,10 @@ class detect_white_line_node():
         self.before_y = []
         self.x = []
         self.y = []
-        self.deg = 0
+        # self.deg = 0
 
-        img = self.cv_image
+        # img = self.cv_image
+        img = cv2.imread(tsudanuma_usb + day + "41-44/frame000016.jpg")
 
         img2 = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
