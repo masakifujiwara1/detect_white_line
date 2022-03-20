@@ -37,6 +37,7 @@ class detect_white_line_node():
         self.deg = 0
         self.save = True
         self.count_deg45 = 0
+        self.center = 0
 
     def callback(self, data):
         try:
@@ -132,7 +133,8 @@ class detect_white_line_node():
             # print(self.count_del)
             self.IQR()
         else:
-            print("Not find white line!")
+            pass
+            # print("Not find white line!")
         # print(x, y)
         # print(count_del)
 
@@ -161,15 +163,18 @@ class detect_white_line_node():
             z = y2 - y1
         tan = z / 640
         self.deg = math.degrees(math.atan(tan))
-        print("degree ->", round(self.deg, 2))
+        print("degree ->", round(self.deg, 3))
 
     def draw_line(self, a, b, img2):
         y2 = -1 * (a * 640 + b)
+        self.center = -1 * (a * 320 + b)
         b = int(b)
         y2 = int(y2)
         y1 = -1 * b
         self.calc_angle(y1, y2)
         cv2.line(img2, (0, y1), (640, y2), (0, 255, 0), 5)
+        cv2.circle(img2, (320,  int(self.center)),
+                   6, (0, 0, 0), thickness=4)
 
     def loop(self):
         self.over = 0
@@ -236,6 +241,20 @@ class detect_white_line_node():
             # a, b = self.calc_line()
         # print(a, b)
             self.draw_line(a, b, img2)
+            cv2.putText(img2, 'Detect white line!', (0, 100),
+                        cv2.FONT_HERSHEY_PLAIN, 3, (0, 255, 255), 3, 8)
+        else:
+            # print("Not fnind white line!")
+            cv2.putText(img2, 'Not detect white line', (0, 100),
+                        cv2.FONT_HERSHEY_PLAIN, 3, (0, 0, 255), 3, 8)
+        # status
+        if self.center >= 280:
+            # print("STOP")
+            cv2.putText(img2, 'status:STOP', (0, 50),
+                        cv2.FONT_HERSHEY_PLAIN, 4, (0, 255, 255), 5, cv2.LINE_AA)
+        else:
+            cv2.putText(img2, 'status:GO', (0, 50),
+                        cv2.FONT_HERSHEY_PLAIN, 4, (0, 0, 255), 5, cv2.LINE_AA)
 
         if round(self.deg, 2) == 45.0:
             # print("copy")
