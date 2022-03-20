@@ -18,9 +18,11 @@ import math
 
 path = "/home/fmasa/catkin_ws/src/detect_white_line/image/tsukuba/"
 dir = "/home/fmasa/catkin_ws/src/detect_white_line/image/"
+tsudanuma = "/home/fmasa/catkin_ws/src/detect_white_line/image/tsudanuma/"
 
 #img = cv2.imread(dir + "20220314_152353.jpg")
-img = cv2.imread(path + "frame_233.jpg")
+# img = cv2.imread(path + "frame_233.jpg")
+img = cv2.imread(tsudanuma + "1101_frame_1537.jpg")
 # img = cv2.imread(dir + "tsudanuma001.jpeg")
 img2 = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 np_img = np.array(img2)

@@ -3,7 +3,7 @@
 # from types import GeneratorType
 
 from multiprocessing.context import assert_spawning
-from turtle import shape
+from turtle import shape, up
 from attr import assoc
 from cv2 import cvtColor, threshold
 import std_msgs
@@ -20,11 +20,17 @@ import csv
 path = "/home/fmasa/catkin_ws/src/detect_white_line/image/tsukuba/"
 dir = "/home/fmasa/catkin_ws/src/detect_white_line/image/"
 tsudanuma = "/home/fmasa/catkin_ws/src/detect_white_line/image/tsudanuma/"
+tsudanuma_usb = "/home/fmasa/catkin_ws/src/detect_white_line/image/tsudanuma_usbcam_1030/"
+day = "2021-10-30-10-"
 
 size = (640, 480)
 
+'''
+select dir and image
+'''
 # img = cv2.imread(path + "frame_246.jpg")
-img = cv2.imread(tsudanuma + "1101_frame_1700.jpg")
+img = cv2.imread(tsudanuma_usb + day + "41-44/frame000016.jpg")
+# img = cv2.imread(tsudanuma + "1101_frame_1296.jpg")
 # img = cv2.imread(dir + "20220314_152251.jpg")
 # img = cv2.imread(dir + "tsudanuma001.jpeg")
 # img = cv2.resize(img, size)
@@ -35,11 +41,19 @@ img_copy = img.copy()
 
 img_copy = cv2.medianBlur(img_copy, 5)
 hsv = cv2.cvtColor(img_copy, cv2.COLOR_BGR2HSV)
-lower_white = np.array([60, 0, 150])
-upper_white = np.array([180, 45, 255])
+# tsukuba 60, 0, 150 : tsudanuma 60, 0, 240 : tsudanuma shadowb 60, 0, 230
+lower_white = np.array([60, 0, 230])
+# tsukuba 180, 45, 255 : tsudanuma 200, 45 ,255 : tsudanuma shadow 210, 60, 255
+upper_white = np.array([200, 45, 255])
+
+lower_silver = np.array([0, 0, 75])
+upper_silver = np.array([0, 0, 200])
 
 mask_white = cv2.inRange(hsv, lower_white, upper_white)
 res_white = cv2.bitwise_and(img_copy, img_copy, mask=mask_white)
+
+mask_silver = cv2.inRange(hsv, lower_silver, upper_silver)
+res_silver = cv2.bitwise_and(img_copy, img_copy, mask=mask_silver)
 
 plt.figure(figsize=(5, 5))
 plt.xticks([]), plt.yticks([])
@@ -111,7 +125,7 @@ def calc_haarlike(crop_img):
     crop_img = crop_img[:, ::-1]
 
     threshold = 10
-    rect_w = 4
+    rect_w = 10
     pattern_w = rect_w // 2
     width = crop_img.shape[0]
 
@@ -141,15 +155,20 @@ def candidate_extraction(img):
     h, w = img.shape[0], img.shape[1]
     wh = 8
     window_pos = np.array([
+        [[100, 200], [108, 470]],
+        [[168, 200], [176, 470]],
         [[236, 200], [244, 470]],
         [[400, 200], [408, 470]],
-        [[316, 200], [324, 470]]
+        [[316, 200], [324, 470]],
+        [[470, 200], [478, 470]],
+        [[540, 200], [548, 470]]
     ])
     for i, ((x1, y1), (x2, y2)) in enumerate(window_pos):
         crop_img = gray[y1: y2, x1: x2]
         cv2.rectangle(img2, (x1, y1), (x2, y2), (255, 0, 0), 1)
         peak_index = calc_haarlike(crop_img)
-        cv2.circle(img2, (x2-4, 470 - peak_index), 4, (0, 0, 255), thickness=2)
+        cv2.circle(img2, (x2-4,  470 - peak_index),
+                   4, (0, 0, 255), thickness=2)
 
 
 def image_vector():
