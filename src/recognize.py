@@ -28,6 +28,10 @@ day = "2021-10-30-10-"
 size = (640, 480)
 GAMMA = 2.5
 over = 0
+count_del = 0
+before_y = []
+x = []
+y = []
 '''
 select dir and image
 '''
@@ -40,7 +44,11 @@ select dir and image
 # img = cv2.imread(tsudanuma_usb + day + "54-09/frame000035.jpg")
 
 # img = cv2.imread(tsudanuma_usb + day + "48-03/frame000026.jpg")
-img = cv2.imread(tsudanuma_usb + day + "54-09/frame000062.jpg")
+img = cv2.imread(tsudanuma_usb + day + "48-03/frame000024.jpg")
+
+# 外れ値除外
+# img = cv2.imread(tsudanuma_usb + day + "54-09/frame000018.jpg")
+
 # img = cv2.imread(tsudanuma + "1101_frame_1296.jpg")
 # img = cv2.imread(dir + "20220314_152251.jpg")
 # img = cv2.imread(dir + "tsudanuma001.jpeg")
@@ -151,7 +159,7 @@ def calc_haarlike(crop_img):
     crop_img = crop_img[:, ::-1]
 
     threshold = 10
-    rect_w = 8
+    rect_w = 4
     pattern_w = rect_w // 2
     width = crop_img.shape[0]
 
@@ -178,11 +186,11 @@ def calc_haarlike(crop_img):
 
 
 def candidate_extraction(img):
-    x = []
-    y = []
-    before_y = []
-    regist = []
+    global x
+    global y
+    global before_y
     global over
+    global count_del
     h, w = img.shape[0], img.shape[1]
     wh = 8
     window_pos = np.array([
@@ -200,15 +208,30 @@ def candidate_extraction(img):
         peak_index = calc_haarlike(crop_img)
         cv2.circle(img2, (x2-4,  470 - peak_index),
                    4, (0, 0, 255), thickness=2)
-        x.append(x2-4)
-        y.append(-1*(470 - peak_index))
-        before_y.append(470 - peak_index)
+        calced_y = -1 * (470 - peak_index)
+        if -471 == calced_y:
+            count_del += 1
+        else:
+            x.append(x2-4)
+            y.append(-1*(470 - peak_index))
+            before_y.append(470 - peak_index)
+    if count_del < 3:
+        print(count_del)
+        IQR()
+    else:
+        print("Not find white line!")
+    # print(x, y)
+    # print(count_del)
+    return x, y
 
+
+def IQR():
     # 外れ値除外 IQR 2, 4, 6
+    regist = []
     sort_y = sorted(before_y)
-    # print(sort_y)
+    print(sort_y)
     range_IQR = int(sort_y[5]) - int(sort_y[1])
-    # print(range)
+    print(range_IQR)
     lim_upper = -1 * (int(sort_y[5]) + (range_IQR * 1.5))
     lim_lower = -1 * (int(sort_y[1]) - (range_IQR * 1.5))
     print(lim_upper, lim_lower)
@@ -223,9 +246,6 @@ def candidate_extraction(img):
         local = regist.index(regist[j])
         del x[local]
         del y[local]
-
-    # print(x, y)
-    return x, y
 
 
 def calc_line(x, y):
@@ -259,64 +279,8 @@ def draw_line(a, b):
     cv2.line(img2, (0, y1), (640, y2), (0, 255, 0), 2)
 
 
-def image_vector():
-    res = np.zeros([3])
-    info = (str(np_img.shape)).replace('(', '').replace(')', '').split(',')
-    # print(info[0], info[1], info[2])
-    m = int(info[0])
-    n = int(info[1])
-    channel = int(info[2])
-
-    p = np.zeros((m, n, channel))
-    # print(p[0][0])
-    for i in range(m):
-        for j in range(n):
-            for k in range(channel):
-                p[i][j][k] = np_img[i][j][k]
-    # print(p[0])
-
-    num_pixel = m * n
-    mup = np.sum(p, axis=0)
-    mup = np.sum(mup, axis=0)
-    mup = (1/(num_pixel-1)) * mup
-    print(mup)
-
-    for i in range(m):
-        for j in range(n):
-            ass = p[i][j] - mup
-            # print(ass)
-            ass_T = ass.T
-            print(ass, ass_T)
-            ass_res = ass * ass_T
-            ass_res = (1/(num_pixel-1)) * ass_res
-            # print(ass_res)
-            res += ass_res
-            # print(ass_res)
-    print(res)
-
-    Rp_val, Rp_vec = LA.eig(res)
-    print(Rp_val)
-    print(Rp_vec)
-
-
-def hough():
-    lines = cv2.HoughLinesP(img_pp,
-                            rho=1,
-                            theta=np.pi/360,
-                            threshold=100,
-                            minLineLength=200,
-                            maxLineGap=10)
-
-    for line in lines:
-        x1, y1, x2, y2 = line[0]
-
-        # 赤線を引く
-        red_line_img = cv2.line(img2, (x1, y1), (x2, y2), (255, 0, 0), 1)
-
-
-# hough()
 x, y = candidate_extraction(gray)
-if over < 3:
+if over < 3 and (not count_del > 5):
     a, b = calc_line(x, y)
 # print(a, b)
     draw_line(a, b)
