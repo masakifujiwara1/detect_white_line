@@ -27,7 +27,6 @@ class detect_white_line_node():
         self.y = []
         self.deg = 0
         self.save = True
-        self.count_deg45 = 0
         self.center = 0
         self.Flag = False
         self.vel_pub = rospy.Publisher("white_vel", Twist, queue_size=10)
