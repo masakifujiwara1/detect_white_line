@@ -41,21 +41,6 @@ class detect_white_line_node():
         except CvBridgeError as e:
             print(e)
 
-    def create_gamma_img(self, gamma, img):
-        gamma_cvt = np.zeros((256, 1), dtype=np.uint8)
-        for i in range(256):
-            gamma_cvt[i][0] = 255*(float(i)/255)**(1.0/gamma)
-        return cv2.LUT(img, gamma_cvt)
-
-    def template(self, dir_path, gray, img):
-        template = cv2.imread(dir_path, 0)
-        w, h = template.shape[::-1]
-        res = cv2.matchTemplate(gray, template, cv2.TM_CCOEFF_NORMED)
-        threshold = 0.8
-        loc = np.where(res >= threshold)
-        for pt in zip(*loc[::-1]):
-            cv2.rectangle(img, pt, (pt[0] + w, pt[1] + h), (0, 0, 255), 1)
-
     def calc_haarlike(self, crop_img):
         crop_img = crop_img[:, ::-1]
 
@@ -189,7 +174,7 @@ class detect_white_line_node():
 
             img_copy = cv2.medianBlur(img_copy, 5)
             hsv = cv2.cvtColor(img_copy, cv2.COLOR_BGR2HSV)
-            # tsukuba 60, 0, 150 : tsudanuma 60, 0, 240 : tsudanuma shadowb 60, 0, 230
+            # tsukuba 60, 0, 150 : tsudanuma 60, 0, 240 : tsudanuma shadow 60, 0, 230
             lower_white = np.array([60, 0, 230])
             # tsukuba 180, 45, 255 : tsudanuma 200, 45 ,255 : tsudanuma shadow 210, 60, 255
             upper_white = np.array([200, 45, 255])
