@@ -5,13 +5,9 @@ from geometry_msgs.msg import Twist
 import numpy as np
 import cv2
 from sensor_msgs.msg import Image
-import matplotlib.pyplot as plt
 import math
 import rospy
 from std_srvs.srv import Trigger, TriggerResponse
-import roslib
-import csv
-from scipy import stats
 from cv_bridge import CvBridge, CvBridgeError
 
 
@@ -86,12 +82,9 @@ class detect_white_line_node():
     def IQR(self):  # excecpt out of range value
         regist = []
         sort_y = sorted(self.before_y)
-        # print(sort_y)
         range_IQR = int(sort_y[5]) - int(sort_y[1])
-        # print("rangeIQR ->", range_IQR)
         lim_upper = -1 * (int(sort_y[5]) + (range_IQR * 1.5))
         lim_lower = -1 * (int(sort_y[1]) - (range_IQR * 1.5))
-        # print(lim_upper, lim_lower)
         for i in range(len(self.x)):
             y_ass = int(self.y[i])
             if y_ass <= lim_upper or y_ass >= lim_lower:
@@ -130,33 +123,15 @@ class detect_white_line_node():
                 self.y.append(-1*(470 - peak_index))
                 self.before_y.append(470 - peak_index)
         if self.count_del < 2:
-            # print(self.count_del)
             self.IQR()
-        else:
-            pass
-            # print("Not find white line!")
-        # print(x, y)
-        # print(count_del)
 
     def calc_line(self):
         x = np.array(self.x)
         y = np.array(self.y)
-        n = len(x)
-        a = ((np.dot(x, y) - y.sum() * x.sum()/n) /
-             ((x ** 2).sum() - x.sum()**2 / n))
-        b = (y.sum() - a * x.sum())/n
-        print(a, b)
-        return a, b
-
-    def calc_line2(self):
-        x = np.array(self.x)
-        y = np.array(self.y)
         coe = np.polyfit(x, y, 1)
-        # print(coe)
         return coe[0], coe[1]
 
     def calc_angle(self, y1, y2):
-        # print(y1, y2)
         if y1 > y2:
             z = y1 - y2
         else:
@@ -236,22 +211,16 @@ class detect_white_line_node():
 
             self.candidate_extraction(gray, img2)
 
-            # print(self.over, self.count_del)
-
             if self.over <= 3 and (not self.count_del > 5):
-                a, b = self.calc_line2()
-                # a, b = self.calc_line()
-            # print(a, b)
+                a, b = self.calc_line()
                 self.draw_line(a, b, img2)
                 cv2.putText(img2, 'Detect white line!', (0, 100),
                             cv2.FONT_HERSHEY_PLAIN, 3, (0, 255, 255), 3, 8)
             else:
-                # print("Not fnind white line!")
                 cv2.putText(img2, 'Not detect white line', (0, 100),
                             cv2.FONT_HERSHEY_PLAIN, 3, (0, 0, 255), 3, 8)
             # status
             if self.center >= 300:
-                # print("STOP")
                 cv2.putText(img2, 'status:STOP', (0, 50),
                             cv2.FONT_HERSHEY_PLAIN, 4, (0, 255, 255), 5, cv2.LINE_AA)
 
