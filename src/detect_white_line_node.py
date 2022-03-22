@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import std_msgs
+from geometry_msgs.msg import Twist
 import numpy as np
 import cv2
 from sensor_msgs.msg import Image
 import matplotlib.pyplot as plt
 import math
 import rospy
+from std_srvs.srv import Trigger, TriggerResponse
 import roslib
 import csv
 from scipy import stats
@@ -32,6 +33,11 @@ class detect_white_line_node():
         self.save = True
         self.count_deg45 = 0
         self.center = 0
+        self.Flag = False
+        self.vel_pub = rospy.Publisher("white_vel", Twist, queue_size=10)
+        self.vel = Twist()
+        self.status = False
+        self.count_end = 0
 
     def callback(self, data):
         try:
@@ -77,7 +83,7 @@ class detect_white_line_node():
         index = width - peak_index + rect_w
         return index if max_value > 0 else -1
 
-    def IQR(self):
+    def IQR(self):  # excecpt out of range value
         regist = []
         sort_y = sorted(self.before_y)
         # print(sort_y)
@@ -170,6 +176,26 @@ class detect_white_line_node():
         cv2.circle(img2, (320,  int(self.center)),
                    6, (0, 0, 0), thickness=4)
 
+    def callback_srv(self, data):
+        resp = TriggerResponse()
+        self.Flag = True
+        self.status = True
+        resp.message = "detect start"
+        resp.success = True
+        self.count_end = 0
+        print(resp.message)
+        return resp
+
+    def control_move(self):
+        if self.status:
+            if self.count_end >= 1:
+                self.vel.linear.x = 0.1
+            else:
+                self.vel.linear.x = 0.2
+        else:
+            self.vel.linear.x = 0.0
+        self.vel_pub.publish(self.vel)
+
     def loop(self):
         self.over = 0
         self.count_del = 0
@@ -179,65 +205,78 @@ class detect_white_line_node():
         self.deg = 0
         self.center = 0
 
-        img = self.cv_image
+        if self.Flag:
+            img = self.cv_image
 
-        img2 = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img2 = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        img_copy = img.copy()
+            img_copy = img.copy()
 
-        img_copy = cv2.medianBlur(img_copy, 5)
-        hsv = cv2.cvtColor(img_copy, cv2.COLOR_BGR2HSV)
-        # tsukuba 60, 0, 150 : tsudanuma 60, 0, 240 : tsudanuma shadowb 60, 0, 230
-        lower_white = np.array([60, 0, 230])
-        # tsukuba 180, 45, 255 : tsudanuma 200, 45 ,255 : tsudanuma shadow 210, 60, 255
-        upper_white = np.array([200, 45, 255])
+            img_copy = cv2.medianBlur(img_copy, 5)
+            hsv = cv2.cvtColor(img_copy, cv2.COLOR_BGR2HSV)
+            # tsukuba 60, 0, 150 : tsudanuma 60, 0, 240 : tsudanuma shadowb 60, 0, 230
+            lower_white = np.array([60, 0, 230])
+            # tsukuba 180, 45, 255 : tsudanuma 200, 45 ,255 : tsudanuma shadow 210, 60, 255
+            upper_white = np.array([200, 45, 255])
 
-        lower_silver = np.array([0, 0, 75])
-        upper_silver = np.array([0, 0, 200])
+            lower_silver = np.array([0, 0, 75])
+            upper_silver = np.array([0, 0, 200])
 
-        mask_white = cv2.inRange(hsv, lower_white, upper_white)
-        res_white = cv2.bitwise_and(img_copy, img_copy, mask=mask_white)
+            mask_white = cv2.inRange(hsv, lower_white, upper_white)
+            res_white = cv2.bitwise_and(img_copy, img_copy, mask=mask_white)
 
-        mask_silver = cv2.inRange(hsv, lower_silver, upper_silver)
-        res_silver = cv2.bitwise_and(img_copy, img_copy, mask=mask_silver)
+            mask_silver = cv2.inRange(hsv, lower_silver, upper_silver)
+            res_silver = cv2.bitwise_and(img_copy, img_copy, mask=mask_silver)
 
-        cv2.imshow("mask", res_white)
+            cv2.imshow("mask", res_white)
 
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        gray_white = cv2.cvtColor(res_white, cv2.COLOR_BGR2GRAY)
-        gray = gray_white
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            gray_white = cv2.cvtColor(res_white, cv2.COLOR_BGR2GRAY)
+            gray = gray_white
 
-        self.candidate_extraction(gray, img2)
+            self.candidate_extraction(gray, img2)
 
-        # print(self.over, self.count_del)
+            # print(self.over, self.count_del)
 
-        if self.over <= 3 and (not self.count_del > 5):
-            a, b = self.calc_line2()
-            # a, b = self.calc_line()
-        # print(a, b)
-            self.draw_line(a, b, img2)
-            cv2.putText(img2, 'Detect white line!', (0, 100),
-                        cv2.FONT_HERSHEY_PLAIN, 3, (0, 255, 255), 3, 8)
+            if self.over <= 3 and (not self.count_del > 5):
+                a, b = self.calc_line2()
+                # a, b = self.calc_line()
+            # print(a, b)
+                self.draw_line(a, b, img2)
+                cv2.putText(img2, 'Detect white line!', (0, 100),
+                            cv2.FONT_HERSHEY_PLAIN, 3, (0, 255, 255), 3, 8)
+            else:
+                # print("Not fnind white line!")
+                cv2.putText(img2, 'Not detect white line', (0, 100),
+                            cv2.FONT_HERSHEY_PLAIN, 3, (0, 0, 255), 3, 8)
+            # status
+            if self.center >= 300:
+                # print("STOP")
+                cv2.putText(img2, 'status:STOP', (0, 50),
+                            cv2.FONT_HERSHEY_PLAIN, 4, (0, 255, 255), 5, cv2.LINE_AA)
+
+                self.count_end += 1
+                self.control_move()
+                if self.count_end >= 5:
+                    self.status = False
+                    self.control_move()
+                    self.Flag = False
+            else:
+                cv2.putText(img2, 'status:GO', (0, 50),
+                            cv2.FONT_HERSHEY_PLAIN, 4, (0, 0, 255), 5, cv2.LINE_AA)
+
+                self.control_move()
+
+            cv2.imshow("detect process", img2)
+            cv2.waitKey(1)
         else:
-            # print("Not fnind white line!")
-            cv2.putText(img2, 'Not detect white line', (0, 100),
-                        cv2.FONT_HERSHEY_PLAIN, 3, (0, 0, 255), 3, 8)
-        # status
-        if self.center >= 300:
-            # print("STOP")
-            cv2.putText(img2, 'status:STOP', (0, 50),
-                        cv2.FONT_HERSHEY_PLAIN, 4, (0, 255, 255), 5, cv2.LINE_AA)
-        else:
-            cv2.putText(img2, 'status:GO', (0, 50),
-                        cv2.FONT_HERSHEY_PLAIN, 4, (0, 0, 255), 5, cv2.LINE_AA)
-
-        cv2.imshow("detect process", img2)
-        cv2.waitKey(1)
+            cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
     rospy.loginfo('detect_white_line_node started')
     rg = detect_white_line_node()
+    srv = rospy.Service("start_detect", Trigger, rg.callback_srv)
     DURATION = 0.2
     r = rospy.Rate(1 / DURATION)
     while not rospy.is_shutdown():
