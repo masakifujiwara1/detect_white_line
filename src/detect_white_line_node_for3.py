@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import std_msgs
@@ -12,6 +12,12 @@ import roslib
 import csv
 from scipy import stats
 from cv_bridge import CvBridge, CvBridgeError
+
+path = "/home/fmasa/catkin_ws/src/detect_white_line/image/tsukuba/"
+dir = "/home/fmasa/catkin_ws/src/detect_white_line/image/"
+tsudanuma = "/home/fmasa/catkin_ws/src/detect_white_line/image/tsudanuma/"
+tsudanuma_usb = "/home/fmasa/catkin_ws/src/detect_white_line/image/tsudanuma_usbcam_1030/"
+day = "2021-10-30-10-"
 
 
 class detect_white_line_node():
@@ -177,12 +183,30 @@ class detect_white_line_node():
         self.x = []
         self.y = []
         self.deg = 0
-        self.center = 0
 
         img = self.cv_image
 
         img2 = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
+        # img2 = create_gamma_img(GAMMA, img2)
+        # plt.imshow(img2)
+
+        hsv_calc = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+        # calc_hist
+        hist = cv2.calcHist([hsv_calc], [0], None, [256], [0, 256])
+        # plt.plot(hist)
+        # mode
+        mode1, count_x = stats.mode(hsv_calc.ravel())
+        # print("mode", mode1)
+        # median
+        median = np.median(hsv_calc)
+        # print("median", median)
+        # average
+        mean = hsv_calc.mean()
+        # print("avg", mean)
+
+        np_img = np.array(img2)
         img_copy = img.copy()
 
         img_copy = cv2.medianBlur(img_copy, 5)
@@ -205,6 +229,7 @@ class detect_white_line_node():
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray_white = cv2.cvtColor(res_white, cv2.COLOR_BGR2GRAY)
+        img_p = gray_white
         gray = gray_white
 
         self.candidate_extraction(gray, img2)
@@ -223,13 +248,22 @@ class detect_white_line_node():
             cv2.putText(img2, 'Not detect white line', (0, 100),
                         cv2.FONT_HERSHEY_PLAIN, 3, (0, 0, 255), 3, 8)
         # status
-        if self.center >= 300:
+        if self.center >= 280:
             # print("STOP")
             cv2.putText(img2, 'status:STOP', (0, 50),
                         cv2.FONT_HERSHEY_PLAIN, 4, (0, 255, 255), 5, cv2.LINE_AA)
         else:
             cv2.putText(img2, 'status:GO', (0, 50),
                         cv2.FONT_HERSHEY_PLAIN, 4, (0, 0, 255), 5, cv2.LINE_AA)
+
+        if round(self.deg, 2) == 45.0:
+            # print("copy")
+            cv2.imwrite(dir + "deg45/deg45_" +
+                        str(self.count_deg45) + ".jpg", img2)
+            self.count_deg45 += 1
+        # print(self.x, self.y)
+        # print(self.count_deg45)
+        # self.save = False
 
         cv2.imshow("detect process", img2)
         cv2.waitKey(1)
