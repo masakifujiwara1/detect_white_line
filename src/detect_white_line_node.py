@@ -44,23 +44,23 @@ class detect_white_line_node():
         crop_img = crop_img[:, ::-1]
 
         threshold = 10
-        rect_w = 4
-        pattern_w = rect_w // 2
-        width = crop_img.shape[0]
+        rect_h = 4
+        pattern_h = rect_h // 2
+        height = crop_img.shape[0]
 
         peak_index = 0
         max_value = 0
 
-        for index in range(width-rect_w):
-            a1 = np.mean(crop_img[index: index+pattern_w, :])
-            a2 = np.mean(crop_img[index+pattern_w: index+rect_w, :])
+        for index in range(height-rect_h):
+            a1 = np.mean(crop_img[index: index+pattern_h, :])
+            a2 = np.mean(crop_img[index+pattern_h: index+rect_h, :])
             H = a1-a2
 
             if max_value < H and H - max_value > threshold:
                 max_value = H
                 peak_index = index
 
-        index = width - peak_index + rect_w
+        index = height - peak_index + rect_h
         return index if max_value > 0 else -1
 
     def IQR(self):  # excecpt out of range value
@@ -208,7 +208,6 @@ class detect_white_line_node():
                             cv2.FONT_HERSHEY_PLAIN, 4, (0, 0, 255), 5, cv2.LINE_AA)
 
                 self.control_move()
-
             cv2.imshow("detect process", img2)
             cv2.waitKey(1)
         else:
