@@ -166,9 +166,7 @@ class detect_white_line_node():
 
         if self.Flag:
             img = self.cv_image
-
-            img2 = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
+            img2 = img.copy()
             img_copy = img.copy()
 
             img_copy = cv2.medianBlur(img_copy, 5)
@@ -178,20 +176,11 @@ class detect_white_line_node():
             # tsukuba 180, 45, 255 : tsudanuma 200, 45 ,255 : tsudanuma shadow 210, 60, 255
             upper_white = np.array([200, 45, 255])
 
-            lower_silver = np.array([0, 0, 75])
-            upper_silver = np.array([0, 0, 200])
-
-            mask_white = cv2.inRange(hsv, lower_white, upper_white)
-            res_white = cv2.bitwise_and(img_copy, img_copy, mask=mask_white)
-
-            mask_silver = cv2.inRange(hsv, lower_silver, upper_silver)
-            res_silver = cv2.bitwise_and(img_copy, img_copy, mask=mask_silver)
+            res_white = cv2.inRange(hsv, lower_white, upper_white)
 
             cv2.imshow("mask", res_white)
 
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            gray_white = cv2.cvtColor(res_white, cv2.COLOR_BGR2GRAY)
-            gray = gray_white
+            gray = res_white
 
             self.candidate_extraction(gray, img2)
 
