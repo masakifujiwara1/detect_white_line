@@ -9,6 +9,7 @@ import math
 import rospy
 from std_srvs.srv import Trigger, TriggerResponse
 from cv_bridge import CvBridge, CvBridgeError
+from topic_tools.srv import MuxSelect, MuxSelectResponse
 
 
 class detect_white_line_node():
@@ -16,7 +17,7 @@ class detect_white_line_node():
         rospy.init_node('detect_white_line_node', anonymous=True)
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber(
-            "/usb_cam/image_raw", Image, self.callback)
+            "/camera/rgb/image_raw", Image, self.callback)
         self.cv_image = np.zeros((480, 640, 3), np.uint8)
         self.size = (640, 480)
         self.GAMMA = 2.5
@@ -28,10 +29,16 @@ class detect_white_line_node():
         self.deg = 0
         self.center = 0
         self.Flag = False
+        self.mux_flag = True
         self.vel_pub = rospy.Publisher("white_vel", Twist, queue_size=10)
         self.vel = Twist()
+        # self.vel_pub.publish(self.vel)
+        # self.vel.linear.x = 0
         self.status = False
         self.count_end = 0
+        self.Mux_srv = rospy.ServiceProxy("/mux/select", MuxSelect)
+        self.node_srv = rospy.Service(
+            "start_detect", Trigger, self.callback_srv)
 
     def callback(self, data):
         try:
@@ -144,14 +151,17 @@ class detect_white_line_node():
         print(resp.message)
         return resp
 
+    def mux_srv(self):
+        if self.mux_flag:
+            self.Mux_srv("/stop_vel")
+            self.mux_flag = False
+
     def control_move(self):
         if self.status:
-            if self.count_end >= 1:
-                self.vel.linear.x = 0.1
-            else:
-                self.vel.linear.x = 0.2
+            pass
         else:
-            self.vel.linear.x = 0.0
+            self.mux_srv()
+        self.vel.linear.x = 0.0
         self.vel_pub.publish(self.vel)
 
     def loop(self):
@@ -200,8 +210,8 @@ class detect_white_line_node():
                 self.control_move()
                 if self.count_end >= 5:
                     self.status = False
-                    self.control_move()
                     self.Flag = False
+                    self.mux_flag = True
             else:
                 cv2.putText(img2, 'status:GO', (0, 50),
                             cv2.FONT_HERSHEY_PLAIN, 4, (0, 0, 255), 5, cv2.LINE_AA)
@@ -211,12 +221,13 @@ class detect_white_line_node():
             cv2.waitKey(1)
         else:
             cv2.destroyAllWindows()
+            # self.control_move()
 
 
 if __name__ == '__main__':
     rospy.loginfo('detect_white_line_node started')
     rg = detect_white_line_node()
-    srv = rospy.Service("start_detect", Trigger, rg.callback_srv)
+    # srv = rospy.Service("start_detect", Trigger, rg.callback_srv)
     DURATION = 0.2
     r = rospy.Rate(1 / DURATION)
     while not rospy.is_shutdown():
