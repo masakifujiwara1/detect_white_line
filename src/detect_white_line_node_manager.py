@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+
 from geometry_msgs.msg import Twist
 import numpy as np
 import cv2
@@ -10,6 +11,8 @@ import rospy
 from std_srvs.srv import Trigger, TriggerResponse
 from cv_bridge import CvBridge, CvBridgeError
 from topic_tools.srv import MuxSelect, MuxSelectResponse
+# import dynamic_reconfigure.client
+# from dynamic_reconfigure.srv import Reconfigure
 
 
 class detect_white_line_node():
@@ -30,13 +33,22 @@ class detect_white_line_node():
         self.center = 0
         self.Flag = False
         self.mux_flag = True
-        self.vel_pub = rospy.Publisher("white_vel", Twist, queue_size=10)
+        self.vel_pub = rospy.Publisher("stop_vel", Twist, queue_size=10)
+        self.lim_vel_pub = rospy.Publisher("lim_vel", Twist, queue_size=10)
+        self.vel_sub = rospy.Subscriber("/nav_vel", Twist, self.callback_vel)
         self.vel = Twist()
+        self.lim_vel = Twist()
         # self.vel_pub.publish(self.vel)
         # self.vel.linear.x = 0
         self.status = False
         self.count_end = 0
         self.Mux_srv = rospy.ServiceProxy("/mux/select", MuxSelect)
+        # rospy.wait_for_service(
+        #     '/move_base/TrajectoryPlannerROS/set_parameters')
+        # self.update_param_srv = rospy.ServiceProxy(
+        #     "/move_base/TrajectoryPlannerROS/set_parameters", Reconfigure)
+        # response = self.update_param_srv()
+        # print(response)
         self.node_srv = rospy.Service(
             "start_detect", Trigger, self.callback_srv)
 
@@ -141,11 +153,20 @@ class detect_white_line_node():
         cv2.circle(img2, (320,  int(self.center)),
                    6, (0, 0, 0), thickness=4)
 
+    def callback_vel(self, data):
+        self.lim_vel = data
+        if data.linear.x >= 0.2:
+            self.lim_vel.linear.x = 0.2
+        self.lim_vel_pub.publish(self.lim_vel)
+
     def callback_srv(self, data):
         resp = TriggerResponse()
         self.Flag = True
         self.status = True
         resp.message = "detect start"
+
+        self.Mux_srv("/lim_vel")
+
         resp.success = True
         self.count_end = 0
         print(resp.message)
@@ -163,6 +184,16 @@ class detect_white_line_node():
             self.mux_srv()
         self.vel.linear.x = 0.0
         self.vel_pub.publish(self.vel)
+
+    def update_param(self):
+        # client = dynamic_reconfigure.client.Client(
+        #     "/move_base/TranjectoryPlannerROS/set_parameters")
+        # for i in range(10):
+        # client.update_configuration({"max_vel_x": 0.5})
+        # self.update_param_srv({"max_vel_x": 0.4})
+
+        # self.update_param_srv({"max_vel_x": 0.4})
+        pass
 
     def loop(self):
         self.over = 0
@@ -210,6 +241,7 @@ class detect_white_line_node():
                 self.control_move()
                 if self.count_end >= 5:
                     self.status = False
+                    self.control_move()
                     self.Flag = False
                     self.mux_flag = True
             else:
