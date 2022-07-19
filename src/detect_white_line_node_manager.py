@@ -20,7 +20,7 @@ class detect_white_line_node():
         rospy.init_node('detect_white_line_node', anonymous=True)
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber(
-            "/camera/rgb/image_raw", Image, self.callback)
+            "/detect_white_line/image_rect_color", Image, self.callback)
         self.cv_image = np.zeros((480, 640, 3), np.uint8)
         self.size = (640, 480)
         self.GAMMA = 2.5
@@ -44,8 +44,13 @@ class detect_white_line_node():
         self.node_srv = rospy.Service(
             "start_detect", Trigger, self.callback_srv)
         # self.pose_color = [316:324, 450:460]
-        self.pose_color = (320, 470)
+        self.pose_color1 = (316, 462)
+        self.pose_color2 = (324, 470)
         self.hsv_filter = 0
+        self.color = 0
+        self.h = []
+        self.s = []
+        self.v = []
 
     def callback(self, data):
         try:
@@ -98,32 +103,41 @@ class detect_white_line_node():
 
     def candidate_extraction(self, gray, img2):
         wh = 8
+        # window_pos = np.array([
+        #     [[100, 50], [108, 320]],
+        #     [[168, 50], [176, 320]],
+        #     [[236, 50], [244, 320]],
+        #     [[316, 50], [324, 320]],
+        #     [[400, 50], [408, 320]],
+        #     [[470, 50], [478, 320]],
+        #     [[540, 50], [548, 320]]
+        # ])
         window_pos = np.array([
-            [[100, 50], [108, 320]],
-            [[168, 50], [176, 320]],
-            [[236, 50], [244, 320]],
-            [[316, 50], [324, 320]],
-            [[400, 50], [408, 320]],
-            [[470, 50], [478, 320]],
-            [[540, 50], [548, 320]]
+            [[100, 200], [108, 470]],
+            [[168, 200], [176, 470]],
+            [[236, 200], [244, 470]],
+            [[316, 200], [324, 470]],
+            [[400, 200], [408, 470]],
+            [[470, 200], [478, 470]],
+            [[540, 200], [548, 470]]
         ])
         for i, ((x1, y1), (x2, y2)) in enumerate(window_pos):
             crop_img = gray[y1: y2, x1: x2]
             cv2.rectangle(img2, (x1, y1), (x2, y2), (255, 0, 0), 1)
             peak_index = self.calc_haarlike(crop_img)
 
-            calced_y = -1 * (320 - peak_index)
-            if -0 <= calced_y <= -1:
+            calced_y = -1 * (470 - peak_index)
+            if -471 <= calced_y <= -468:
                 self.count_del += 1
             else:
-                cv2.circle(img2, (x2-4,  320 - peak_index),
+                cv2.circle(img2, (x2-4,  470 - peak_index),
                            4, (0, 0, 255), thickness=2)
                 self.x.append(x2-4)
-                self.y.append(-1*(320 - peak_index))
-                self.before_y.append(320 - peak_index)
+                self.y.append(-1*(470 - peak_index))
+                self.before_y.append(470 - peak_index)
         if self.count_del < 2:
-            # self.IQR()
-            pass
+            self.IQR()
+            # pass
 
     def calc_line(self):
         x = np.array(self.x)
@@ -163,7 +177,7 @@ class detect_white_line_node():
         self.status = True
         resp.message = "detect start"
 
-        self.Mux_srv("/lim_vel")
+        self.Mux_srv("/detect_white_line/lim_vel")
 
         resp.success = True
         self.count_end = 0
@@ -172,7 +186,7 @@ class detect_white_line_node():
 
     def mux_srv(self):
         if self.mux_flag:
-            self.Mux_srv("/stop_vel")
+            self.Mux_srv("/detect_white_line/stop_vel")
             self.mux_flag = False
 
     def control_move(self):
@@ -192,11 +206,6 @@ class detect_white_line_node():
 
         # self.update_param_srv({"max_vel_x": 0.4})
         pass
-
-    def get_clolor(self, hsv):
-        color = hsv[self.pose_color]
-        print(color)
-        self.hsv_filter = color
 
     def loop(self):
         self.over = 0
@@ -218,28 +227,14 @@ class detect_white_line_node():
             hsv = cv2.cvtColor(img_copy, cv2.COLOR_BGR2HSV)
             hsv_get = hsv.copy()
 
-            self.get_clolor(hsv_get)
+            # self.get_clolor2(hsv_get)
+            # cv2.circle(img2, (320,  470),
+            #        6, (0, 0, 0), thickness=4)
 
             # tsukuba 60, 0, 150 : tsudanuma 60, 0, 240 : tsudanuma shadow 60, 0, 230
-            # lower_white = np.array([60, 0, 230])
+            lower_white = np.array([60, 0, 230])
             # tsukuba 180, 45, 255 : tsudanuma 200, 45 ,255 : tsudanuma shadow 210, 60, 255
-            # upper_white = np.array([200, 45, 255])
-
-            # use hsv filter
-            lw = []
-            uw = []
-            for i in range(3):
-                if self.hsv_filter[i] - 10 < 0:
-                    lw.append(int(0))
-                else:
-                    lw.append(int(self.hsv_filter[i] - 10))
-            for i in range(3):
-                if self.hsv_filter[i] + 10 > 255:
-                    uw.append(int(255))
-                else:
-                    uw.append(int(self.hsv_filter[i] + 10))
-            lower_white = np.array([lw[0], lw[1], lw[2]])
-            upper_white = np.array([uw[0], uw[1], uw[2]])
+            upper_white = np.array([200, 45, 255])
 
             res_white = cv2.inRange(hsv, lower_white, upper_white)
 
@@ -259,7 +254,7 @@ class detect_white_line_node():
                 #             cv2.FONT_HERSHEY_PLAIN, 3, (0, 0, 255), 3, 8)
                 pass
             # status
-            if self.center >= 300:
+            if self.center >= 430:
                 cv2.putText(img2, 'status:STOP', (0, 50),
                             cv2.FONT_HERSHEY_PLAIN, 4, (0, 255, 255), 5, cv2.LINE_AA)
 
@@ -268,7 +263,7 @@ class detect_white_line_node():
                 if self.count_end >= 5:
                     self.status = False
                     self.control_move()
-                    # self.Flag = False
+                    self.Flag = False
                     self.mux_flag = True
             else:
                 cv2.putText(img2, 'status:GO', (0, 50),
